@@ -3,64 +3,51 @@ package com.glassous.fiacloud.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.glassous.fiacloud.data.S3Config
 import com.glassous.fiacloud.data.SettingsRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepo = SettingsRepository(application)
 
-    private val _endpoint = MutableStateFlow("")
-    val endpoint: StateFlow<String> = _endpoint.asStateFlow()
+    val s3Configs: StateFlow<List<S3Config>> = settingsRepo.s3Configs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _accessKey = MutableStateFlow("")
-    val accessKey: StateFlow<String> = _accessKey.asStateFlow()
+    val activeS3ConfigId: StateFlow<String?> = settingsRepo.activeS3ConfigId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _secretKey = MutableStateFlow("")
-    val secretKey: StateFlow<String> = _secretKey.asStateFlow()
-
-    private val _bucketName = MutableStateFlow("")
-    val bucketName: StateFlow<String> = _bucketName.asStateFlow()
-
-    private val _region = MutableStateFlow("us-east-1")
-    val region: StateFlow<String> = _region.asStateFlow()
+    val activeS3Config: StateFlow<S3Config?> = settingsRepo.activeS3Config
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
         viewModelScope.launch {
-            settingsRepo.endpoint.collectLatest { _endpoint.value = it }
-        }
-        viewModelScope.launch {
-            settingsRepo.accessKey.collectLatest { _accessKey.value = it }
-        }
-        viewModelScope.launch {
-            settingsRepo.secretKey.collectLatest { _secretKey.value = it }
-        }
-        viewModelScope.launch {
-            settingsRepo.bucketName.collectLatest { _bucketName.value = it }
-        }
-        viewModelScope.launch {
-            settingsRepo.region.collectLatest { _region.value = it }
+            settingsRepo.migrateIfNecessary()
         }
     }
 
-    fun updateEndpoint(value: String) { _endpoint.value = value }
-    fun updateAccessKey(value: String) { _accessKey.value = value }
-    fun updateSecretKey(value: String) { _secretKey.value = value }
-    fun updateBucketName(value: String) { _bucketName.value = value }
-    fun updateRegion(value: String) { _region.value = value }
-
-    fun saveSettings() {
+    fun addS3Config(name: String) {
         viewModelScope.launch {
-            settingsRepo.saveSettings(
-                endpoint.value,
-                accessKey.value,
-                secretKey.value,
-                bucketName.value,
-                region.value
-            )
+            val newConfig = S3Config(name = name)
+            settingsRepo.addS3Config(newConfig)
+        }
+    }
+
+    fun updateS3Config(config: S3Config) {
+        viewModelScope.launch {
+            settingsRepo.updateS3Config(config)
+        }
+    }
+
+    fun deleteS3Config(id: String) {
+        viewModelScope.launch {
+            settingsRepo.deleteS3Config(id)
+        }
+    }
+
+    fun setActiveS3Config(id: String) {
+        viewModelScope.launch {
+            settingsRepo.setActiveS3Config(id)
         }
     }
 }

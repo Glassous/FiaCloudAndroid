@@ -8,14 +8,6 @@ import com.glassous.fiacloud.data.SettingsRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-data class S3Config(
-    val endpoint: String,
-    val accessKey: String,
-    val secretKey: String,
-    val region: String,
-    val bucketName: String
-)
-
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepo = SettingsRepository(application)
     
@@ -32,35 +24,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            combine(
-                settingsRepo.endpoint,
-                settingsRepo.accessKey,
-                settingsRepo.secretKey,
-                settingsRepo.region,
-                settingsRepo.bucketName
-            ) { args: Array<String> ->
-                S3Config(
-                    endpoint = args[0],
-                    accessKey = args[1],
-                    secretKey = args[2],
-                    region = args[3],
-                    bucketName = args[4]
-                )
-            }.collectLatest { config ->
-                S3Repository.updateConfig(
-                    config.endpoint, 
-                    config.accessKey, 
-                    config.secretKey, 
-                    config.region
-                )
-                currentBucketName = config.bucketName
-                
-                // 即使配置为空，也尝试进行连接，由SDK抛出具体异常
-                if (config.bucketName.isNotEmpty()) {
-                    loadFiles(config.bucketName)
+            settingsRepo.activeS3Config.collectLatest { config ->
+                if (config != null) {
+                    S3Repository.updateConfig(config)
+                    currentBucketName = config.bucketName
+                    
+                    if (config.bucketName.isNotEmpty()) {
+                        loadFiles(config.bucketName)
+                    } else {
+                        loadFiles("")
+                    }
                 } else {
-                    // 尝试传空字符串给 listObjects
-                    loadFiles("")
+                    _files.value = emptyList()
+                    _error.value = "S3 客户端未配置，请前往设置页面进行配置。"
                 }
             }
         }

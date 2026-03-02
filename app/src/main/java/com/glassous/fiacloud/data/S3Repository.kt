@@ -12,7 +12,7 @@ import aws.smithy.kotlin.runtime.collections.Attributes
 object S3Repository {
     private var s3Client: S3Client? = null
 
-    suspend fun updateConfig(endpoint: String, accessKey: String, secretKey: String, region: String) {
+    suspend fun updateConfig(config: S3Config) {
         try {
             s3Client?.close()
         } catch (e: Exception) {
@@ -21,25 +21,23 @@ object S3Repository {
         
         try {
             s3Client = S3Client {
-                this.region = if (region.isBlank()) "us-east-1" else region
+                this.region = if (config.region.isBlank()) "us-east-1" else config.region
                 credentialsProvider = object : CredentialsProvider {
                     override suspend fun resolve(attributes: Attributes): Credentials {
-                        return Credentials(accessKey, secretKey)
+                        return Credentials(config.accessKey, config.secretKey)
                     }
                 }
-                if (endpoint.isNotBlank()) {
-                    val fullEndpoint = if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
-                        "https://$endpoint"
+                if (config.endpoint.isNotBlank()) {
+                    val fullEndpoint = if (!config.endpoint.startsWith("http://") && !config.endpoint.startsWith("https://")) {
+                        "https://${config.endpoint}"
                     } else {
-                        endpoint
+                        config.endpoint
                     }
                     this.endpointUrl = Url.parse(fullEndpoint)
                 }
-                // Removed forcePathStyle as per requirement
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            // Handle error or rethrow
         }
     }
 
