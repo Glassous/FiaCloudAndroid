@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,8 +45,16 @@ fun S3ListScreen(
                     }
                 },
                 actions = {
+                    var showHelpDialog by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showHelpDialog = true }) {
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, "配置帮助")
+                    }
                     IconButton(onClick = onAddNewConfig) {
                         Icon(Icons.Default.Add, "新增")
+                    }
+
+                    if (showHelpDialog) {
+                        S3HelpDialog(onDismiss = { showHelpDialog = false })
                     }
                 }
             )
@@ -157,9 +166,16 @@ fun S3DetailScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
-                },
-                actions = {
-                    IconButton(onClick = {
+                }
+            )
+        },
+        bottomBar = {
+            Surface(
+                tonalElevation = 3.dp,
+                shadowElevation = 8.dp
+            ) {
+                Button(
+                    onClick = {
                         viewModel.updateS3Config(config.copy(
                             name = name,
                             endpoint = endpoint,
@@ -169,11 +185,17 @@ fun S3DetailScreen(
                             region = region
                         ))
                         onNavigateBack()
-                    }) {
-                        Icon(Icons.Default.Save, "保存")
-                    }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .navigationBarsPadding()
+                ) {
+                    Icon(Icons.Default.Save, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("保存配置")
                 }
-            )
+            }
         }
     ) { padding ->
         Column(
@@ -228,10 +250,74 @@ fun S3DetailScreen(
             OutlinedTextField(
                 value = region,
                 onValueChange = { region = it },
-                label = { Text("区域 (例如 us-east-1)") },
+                label = { Text("区域 (可选，默认为 us-east-1)") },
+                placeholder = { Text("例如 us-east-1") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+@Composable
+fun S3HelpDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("S3 配置指南") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HelpSection(
+                    title = "Amazon S3",
+                    content = "• 端点: s3.amazonaws.com\n• 区域: 根据你的 Bucket 所在区域填写 (如 us-east-1)\n• 密钥: 在 AWS IAM 控制台获取\n• 注意: AWS 必须正确填写区域以进行请求签名"
+                )
+                HelpSection(
+                    title = "Cloudflare R2",
+                    content = "• 端点: <account_id>.r2.cloudflarestorage.com\n• 区域: 可不填或填 auto\n• 密钥: 在 R2 仪表盘创建 API 令牌获取"
+                )
+                HelpSection(
+                    title = "阿里云 OSS (S3 兼容)",
+                    content = "• 端点: <bucket>.<region>-internal.aliyuncs.com (外网去掉 -internal)\n• 区域: 可不填，默认为 us-east-1 或根据端点自动识别\n• 密钥: 阿里云 RAM 控制台获取"
+                )
+                HelpSection(
+                    title = "腾讯云 COS (S3 兼容)",
+                    content = "• 端点: cos.<region>.myqcloud.com\n• 区域: 根据 COS 区域填写 (如 ap-shanghai)\n• 密钥: 腾讯云控制台获取 API 密钥"
+                )
+                HelpSection(
+                    title = "MinIO (私有部署)",
+                    content = "• 端点: 你的 MinIO 服务器地址 (如 192.168.1.100:9000)\n• 区域: us-east-1 (默认)\n• 密钥: MinIO 管理后台创建"
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("我知道了")
+            }
+        }
+    )
+}
+
+@Composable
+fun HelpSection(title: String, content: String) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = content,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 8.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     }
 }
