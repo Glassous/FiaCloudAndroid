@@ -1,7 +1,7 @@
 package com.glassous.fiacloud.data
 
 import aws.sdk.kotlin.services.s3.S3Client
-import aws.sdk.kotlin.services.s3.model.ListObjectsV2Request
+import aws.sdk.kotlin.services.s3.model.*
 import aws.smithy.kotlin.runtime.auth.awscredentials.Credentials
 import aws.smithy.kotlin.runtime.auth.awscredentials.CredentialsProvider
 import aws.smithy.kotlin.runtime.net.url.Url
@@ -11,6 +11,12 @@ import aws.smithy.kotlin.runtime.collections.Attributes
 
 object S3Repository {
     private var s3Client: S3Client? = null
+
+    data class S3Object(
+        val key: String,
+        val isFolder: Boolean,
+        val displayName: String
+    )
 
     suspend fun updateConfig(config: S3Config) {
         try {
@@ -41,14 +47,133 @@ object S3Repository {
         }
     }
 
-    suspend fun listObjects(bucketName: String): List<String> = withContext(Dispatchers.IO) {
+    suspend fun listObjects(bucketName: String, prefix: String = "", delimiter: String = "/"): List<S3Object> = withContext(Dispatchers.IO) {
         val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
         try {
             val request = ListObjectsV2Request {
                 bucket = bucketName
+                this.prefix = if (prefix.isEmpty()) null else prefix
+                this.delimiter = delimiter
             }
             val response = client.listObjectsV2(request)
-            response.contents?.mapNotNull { it.key } ?: emptyList()
+            
+            val folders = response.commonPrefixes?.mapNotNull { commonPrefix ->
+                commonPrefix.prefix?.let { p ->
+                    S3Object(
+                        key = p,
+                        isFolder = true,
+                        displayName = p.removeSuffix("/").substringAfterLast("/")
+                    )
+                }
+            } ?: emptyList()
+
+            val files = response.contents?.mapNotNull { content ->
+                content.key?.let { k ->
+                    if (k == prefix) return@let null // 排除当前目录
+                    S3Object(
+                        key = k,
+                        isFolder = false,
+                        displayName = k.substringAfterLast("/")
+                    )
+                }
+            } ?: emptyList()
+
+            folders + files
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun deleteObject(bucketName: String, key: String, isFolder: Boolean) = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            if (isFolder) {
+                // 列出该目录下所有对象并删除
+                var continuationToken: String? = null
+                do {
+                    val listRequest = ListObjectsV2Request {
+                        bucket = bucketName
+                        prefix = key
+                        this.continuationToken = continuationToken
+                    }
+                    val listResponse = client.listObjectsV2(listRequest)
+                    val objectsToDelete = listResponse.contents?.mapNotNull { it.key } ?: emptyList()
+                    
+                    if (objectsToDelete.isNotEmpty()) {
+                        val deleteRequest = DeleteObjectsRequest {
+                            bucket = bucketName
+                            delete {
+                                objects = objectsToDelete.map { ObjectIdentifier { this.key = it } }
+                            }
+                        }
+                        client.deleteObjects(deleteRequest)
+                    }
+                    continuationToken = listResponse.nextContinuationToken
+                } while (listResponse.isTruncated == true)
+            } else {
+                val request = DeleteObjectRequest {
+                    bucket = bucketName
+                    this.key = key
+                }
+                client.deleteObject(request)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun renameObject(bucketName: String, oldKey: String, newKey: String, isFolder: Boolean) = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            if (isFolder) {
+                // 列出所有子项，依次复制并删除
+                var continuationToken: String? = null
+                do {
+                    val listRequest = ListObjectsV2Request {
+                        bucket = bucketName
+                        prefix = oldKey
+                        this.continuationToken = continuationToken
+                    }
+                    val listResponse = client.listObjectsV2(listRequest)
+                    listResponse.contents?.forEach { obj ->
+                        val k = obj.key ?: return@forEach
+                        val targetKey = k.replaceFirst(oldKey, newKey)
+                        
+                        // 复制
+                        val copyRequest = CopyObjectRequest {
+                            bucket = bucketName
+                            copySource = "$bucketName/$k"
+                            key = targetKey
+                        }
+                        client.copyObject(copyRequest)
+                        
+                        // 删除旧的
+                        val deleteRequest = DeleteObjectRequest {
+                            bucket = bucketName
+                            key = k
+                        }
+                        client.deleteObject(deleteRequest)
+                    }
+                    continuationToken = listResponse.nextContinuationToken
+                } while (listResponse.isTruncated == true)
+            } else {
+                // 复制
+                val copyRequest = CopyObjectRequest {
+                    bucket = bucketName
+                    copySource = "$bucketName/$oldKey"
+                    key = newKey
+                }
+                client.copyObject(copyRequest)
+                
+                // 删除旧的
+                val deleteRequest = DeleteObjectRequest {
+                    bucket = bucketName
+                    key = oldKey
+                }
+                client.deleteObject(deleteRequest)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

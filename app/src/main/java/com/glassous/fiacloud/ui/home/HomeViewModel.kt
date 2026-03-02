@@ -11,14 +11,17 @@ import kotlinx.coroutines.launch
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepo = SettingsRepository(application)
     
-    private val _files = MutableStateFlow<List<String>>(emptyList())
-    val files: StateFlow<List<String>> = _files.asStateFlow()
+    private val _files = MutableStateFlow<List<S3Repository.S3Object>>(emptyList())
+    val files: StateFlow<List<S3Repository.S3Object>> = _files.asStateFlow()
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _currentPrefix = MutableStateFlow("")
+    val currentPrefix: StateFlow<String> = _currentPrefix.asStateFlow()
 
     private var currentBucketName: String = ""
 
@@ -28,11 +31,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (config != null) {
                     S3Repository.updateConfig(config)
                     currentBucketName = config.bucketName
+                    _currentPrefix.value = "" // 重置路径
                     
                     if (config.bucketName.isNotEmpty()) {
-                        loadFiles(config.bucketName)
+                        loadFiles(config.bucketName, "")
                     } else {
-                        loadFiles("")
+                        loadFiles("", "")
                     }
                 } else {
                     _files.value = emptyList()
@@ -44,18 +48,81 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refresh() {
         viewModelScope.launch {
-            loadFiles(currentBucketName)
+            loadFiles(currentBucketName, _currentPrefix.value)
         }
     }
 
-    private suspend fun loadFiles(bucketName: String) {
+    fun navigateInto(prefix: String) {
+        viewModelScope.launch {
+            _currentPrefix.value = prefix
+            loadFiles(currentBucketName, prefix)
+        }
+    }
+
+    fun navigateBack(): Boolean {
+        val current = _currentPrefix.value
+        if (current.isEmpty()) return false
+        
+        val parent = current.removeSuffix("/").substringBeforeLast("/", "").let {
+            if (it.isEmpty()) "" else "$it/"
+        }
+        
+        _currentPrefix.value = parent
+        viewModelScope.launch {
+            loadFiles(currentBucketName, parent)
+        }
+        return true
+    }
+
+    fun deleteItem(item: S3Repository.S3Object) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                S3Repository.deleteObject(currentBucketName, item.key, item.isFolder)
+                loadFiles(currentBucketName, _currentPrefix.value)
+            } catch (e: Exception) {
+                _error.value = getErrorMessage(e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun renameItem(item: S3Repository.S3Object, newName: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val oldKey = item.key
+                val newKey = if (item.isFolder) {
+                    val parent = oldKey.removeSuffix("/").substringBeforeLast("/", "").let {
+                        if (it.isEmpty()) "" else "$it/"
+                    }
+                    "$parent$newName/"
+                } else {
+                    val parent = oldKey.substringBeforeLast("/", "").let {
+                        if (it.isEmpty()) "" else "$it/"
+                    }
+                    "$parent$newName"
+                }
+                
+                if (newKey != oldKey) {
+                    S3Repository.renameObject(currentBucketName, oldKey, newKey, item.isFolder)
+                    loadFiles(currentBucketName, _currentPrefix.value)
+                }
+            } catch (e: Exception) {
+                _error.value = getErrorMessage(e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun loadFiles(bucketName: String, prefix: String) {
         _isLoading.value = true
         _error.value = null
         try {
-            // 如果 bucketName 为空，SDK 可能会抛错，符合用户预期
-            _files.value = S3Repository.listObjects(bucketName)
+            _files.value = S3Repository.listObjects(bucketName, prefix)
         } catch (e: Exception) {
-            // 忽略 HttpClientEngine closed 异常，因为这通常发生在配置快速更新时
             if (e.message?.contains("HttpClientEngine already closed", ignoreCase = true) == true) {
                 return
             }
