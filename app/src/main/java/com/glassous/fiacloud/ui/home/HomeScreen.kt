@@ -34,11 +34,15 @@ fun HomeScreen(
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
                     }
-                }
+                },
+                windowInsets = WindowInsets.statusBars
             )
-        }
+        },
+        contentWindowInsets = WindowInsets.navigationBars
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+        Box(modifier = Modifier
+            .padding(top = padding.calculateTopPadding())
+            .fillMaxSize()) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (error != null) {
@@ -52,7 +56,11 @@ fun HomeScreen(
                     }
                 }
             } else {
-                LazyColumn {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        bottom = padding.calculateBottomPadding()
+                    )
+                ) {
                     items(files) { file ->
                         ListItem(
                             headlineContent = { Text(file) },
