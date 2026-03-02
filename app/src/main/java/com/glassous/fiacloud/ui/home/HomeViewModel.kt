@@ -23,6 +23,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentPrefix = MutableStateFlow("")
     val currentPrefix: StateFlow<String> = _currentPrefix.asStateFlow()
 
+    private val _editingFile = MutableStateFlow<S3Repository.S3Object?>(null)
+    val editingFile: StateFlow<S3Repository.S3Object?> = _editingFile.asStateFlow()
+
+    private val _viewingUnsupportedFile = MutableStateFlow<S3Repository.S3Object?>(null)
+    val viewingUnsupportedFile: StateFlow<S3Repository.S3Object?> = _viewingUnsupportedFile.asStateFlow()
+
+    private val _fileContent = MutableStateFlow<String>("")
+    val fileContent: StateFlow<String> = _fileContent.asStateFlow()
+
     private var currentBucketName: String = ""
 
     init {
@@ -32,6 +41,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     S3Repository.updateConfig(config)
                     currentBucketName = config.bucketName
                     _currentPrefix.value = "" // 重置路径
+                    _editingFile.value = null // 重置编辑状态
+                    _viewingUnsupportedFile.value = null // 重置预览状态
                     
                     if (config.bucketName.isNotEmpty()) {
                         loadFiles(config.bucketName, "")
@@ -60,6 +71,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigateBack(): Boolean {
+        if (_editingFile.value != null) {
+            _editingFile.value = null
+            return true
+        }
+
+        if (_viewingUnsupportedFile.value != null) {
+            _viewingUnsupportedFile.value = null
+            return true
+        }
+
         val current = _currentPrefix.value
         if (current.isEmpty()) return false
         
@@ -72,6 +93,51 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             loadFiles(currentBucketName, parent)
         }
         return true
+    }
+
+    fun openFile(item: S3Repository.S3Object) {
+        if (item.displayName.endsWith(".txt", ignoreCase = true)) {
+            viewModelScope.launch {
+                _isLoading.value = true
+                _error.value = null
+                try {
+                    val content = S3Repository.getObjectContent(currentBucketName, item.key)
+                    _fileContent.value = content
+                    _editingFile.value = item
+                } catch (e: Exception) {
+                    _error.value = getErrorMessage(e)
+                } finally {
+                    _isLoading.value = false
+                }
+            }
+        } else {
+            // 非 .txt 文件，进入不支持页面
+            _viewingUnsupportedFile.value = item
+        }
+    }
+
+    fun saveFileContent(content: String) {
+        val file = _editingFile.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                S3Repository.putObjectContent(currentBucketName, file.key, content)
+                _fileContent.value = content
+                // 保存后不再自动退出编辑，符合用户新需求
+                loadFiles(currentBucketName, _currentPrefix.value)
+            } catch (e: Exception) {
+                _error.value = getErrorMessage(e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun closeFile() {
+        _editingFile.value = null
+        _viewingUnsupportedFile.value = null
+        _fileContent.value = ""
     }
 
     fun deleteItem(item: S3Repository.S3Object) {

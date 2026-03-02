@@ -8,6 +8,8 @@ import aws.smithy.kotlin.runtime.net.url.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import aws.smithy.kotlin.runtime.collections.Attributes
+import aws.smithy.kotlin.runtime.content.ByteStream
+import aws.smithy.kotlin.runtime.content.decodeToString
 
 object S3Repository {
     private var s3Client: S3Client? = null
@@ -79,6 +81,37 @@ object S3Repository {
             } ?: emptyList()
 
             folders + files
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun getObjectContent(bucketName: String, key: String): String = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            val request = GetObjectRequest {
+                bucket = bucketName
+                this.key = key
+            }
+            client.getObject(request) { response ->
+                response.body?.decodeToString() ?: ""
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun putObjectContent(bucketName: String, key: String, content: String) = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            val request = PutObjectRequest {
+                bucket = bucketName
+                this.key = key
+                body = ByteStream.fromString(content)
+            }
+            client.putObject(request)
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

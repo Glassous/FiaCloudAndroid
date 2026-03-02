@@ -30,76 +30,93 @@ fun HomeScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val currentPrefix by viewModel.currentPrefix.collectAsState()
+    val editingFile by viewModel.editingFile.collectAsState()
+    val viewingUnsupportedFile by viewModel.viewingUnsupportedFile.collectAsState()
+    val fileContent by viewModel.fileContent.collectAsState()
 
-    BackHandler(enabled = currentPrefix.isNotEmpty()) {
+    BackHandler(enabled = currentPrefix.isNotEmpty() || editingFile != null || viewingUnsupportedFile != null) {
         viewModel.navigateBack()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text("FiaCloud")
+    if (editingFile != null) {
+        TextEditorScreen(
+            file = editingFile!!,
+            initialContent = fileContent,
+            onBack = { viewModel.closeFile() },
+            onSave = { viewModel.saveFileContent(it) }
+        )
+    } else if (viewingUnsupportedFile != null) {
+        UnsupportedFileScreen(
+            file = viewingUnsupportedFile!!,
+            onBack = { viewModel.closeFile() }
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { 
+                        Column {
+                            Text("FiaCloud")
+                            if (currentPrefix.isNotEmpty()) {
+                                Text(
+                                    text = currentPrefix,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
                         if (currentPrefix.isNotEmpty()) {
-                            Text(
-                                text = currentPrefix,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            IconButton(onClick = { viewModel.navigateBack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "刷新")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "设置")
+                        }
+                    },
+                    windowInsets = WindowInsets.statusBars
+                )
+            },
+            contentWindowInsets = WindowInsets.navigationBars
+        ) { padding ->
+            Box(modifier = Modifier
+                .padding(top = padding.calculateTopPadding())
+                .fillMaxSize()) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (error != null) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = error!!, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = onNavigateToSettings) {
+                            Text("去设置")
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(
+                            bottom = padding.calculateBottomPadding()
+                        )
+                    ) {
+                        items(files) { item ->
+                            S3ItemRow(
+                                item = item,
+                                onFolderClick = { viewModel.navigateInto(item.key) },
+                                onFileClick = { viewModel.openFile(item) },
+                                onDelete = { viewModel.deleteItem(item) },
+                                onRename = { newName -> viewModel.renameItem(item, newName) }
                             )
                         }
-                    }
-                },
-                navigationIcon = {
-                    if (currentPrefix.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.navigateBack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
-                    }
-                },
-                windowInsets = WindowInsets.statusBars
-            )
-        },
-        contentWindowInsets = WindowInsets.navigationBars
-    ) { padding ->
-        Box(modifier = Modifier
-            .padding(top = padding.calculateTopPadding())
-            .fillMaxSize()) {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (error != null) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(text = error!!, color = MaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onNavigateToSettings) {
-                        Text("去设置")
-                    }
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        bottom = padding.calculateBottomPadding()
-                    )
-                ) {
-                    items(files) { item ->
-                        S3ItemRow(
-                            item = item,
-                            onFolderClick = { viewModel.navigateInto(item.key) },
-                            onFileClick = { /* TODO: Handle file click */ },
-                            onDelete = { viewModel.deleteItem(item) },
-                            onRename = { newName -> viewModel.renameItem(item, newName) }
-                        )
                     }
                 }
             }
