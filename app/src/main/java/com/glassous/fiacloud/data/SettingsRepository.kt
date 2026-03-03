@@ -27,6 +27,17 @@ class SettingsRepository(private val context: Context) {
         // New keys
         val S3_CONFIGS = stringPreferencesKey("s3_configs")
         val ACTIVE_S3_CONFIG_ID = stringPreferencesKey("active_s3_config_id")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
+    }
+
+    val themeMode: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[THEME_MODE] ?: "SYSTEM"
+    }
+
+    suspend fun setThemeMode(mode: String) {
+        context.dataStore.edit { preferences ->
+            preferences[THEME_MODE] = mode
+        }
     }
 
     val s3Configs: Flow<List<S3Config>> = context.dataStore.data.map { preferences ->

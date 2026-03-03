@@ -40,6 +40,12 @@
             android:exported="false"
             android:label="设置"
             android:theme="@style/Theme.FiaCloud" />
+
+        <activity
+            android:name=".ViewerActivity"
+            android:exported="false"
+            android:label="预览"
+            android:theme="@style/Theme.FiaCloud" />
     </application>
 
 </manifest>

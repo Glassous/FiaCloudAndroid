@@ -35,6 +35,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val activeS3Config by viewModel.activeS3Config.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
 
     Scaffold(
         topBar = {
@@ -63,6 +64,37 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // 主题切换
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "外观主题",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val options = listOf("SYSTEM" to "跟随系统", "LIGHT" to "浅色", "DARK" to "深色")
+                        options.forEachIndexed { index, (mode, label) ->
+                            SegmentedButton(
+                                selected = themeMode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+            }
             
             Card(
                 modifier = Modifier.fillMaxWidth(),

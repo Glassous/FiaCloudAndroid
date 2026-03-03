@@ -30,20 +30,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentPrefix = MutableStateFlow("")
     val currentPrefix: StateFlow<String> = _currentPrefix.asStateFlow()
 
-    private val _editingFile = MutableStateFlow<S3Repository.S3Object?>(null)
-    val editingFile: StateFlow<S3Repository.S3Object?> = _editingFile.asStateFlow()
-
-    private val _viewingUnsupportedFile = MutableStateFlow<S3Repository.S3Object?>(null)
-    val viewingUnsupportedFile: StateFlow<S3Repository.S3Object?> = _viewingUnsupportedFile.asStateFlow()
-
-    private val _viewingMediaFile = MutableStateFlow<Pair<S3Repository.S3Object, File?>?>(null)
-    val viewingMediaFile: StateFlow<Pair<S3Repository.S3Object, File?>?> = _viewingMediaFile.asStateFlow()
-
-    private val _fileContent = MutableStateFlow<String>("")
-    val fileContent: StateFlow<String> = _fileContent.asStateFlow()
-
-    private val _isPreviewMode = MutableStateFlow(true)
-    val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
+    val themeMode: StateFlow<String> = settingsRepo.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SYSTEM")
 
     private var currentBucketName: String = ""
 
@@ -54,8 +42,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     S3Repository.updateConfig(config)
                     currentBucketName = config.bucketName
                     _currentPrefix.value = "" // 重置路径
-                    _editingFile.value = null // 重置编辑状态
-                    _viewingUnsupportedFile.value = null // 重置预览状态
                     
                     if (config.bucketName.isNotEmpty()) {
                         loadFiles(config.bucketName, "")
@@ -84,21 +70,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun navigateBack(): Boolean {
-        if (_editingFile.value != null) {
-            _editingFile.value = null
-            return true
-        }
-
-        if (_viewingUnsupportedFile.value != null) {
-            _viewingUnsupportedFile.value = null
-            return true
-        }
-
-        if (_viewingMediaFile.value != null) {
-            _viewingMediaFile.value = null
-            return true
-        }
-
         val current = _currentPrefix.value
         if (current.isEmpty()) return false
         
@@ -113,10 +84,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    fun openFile(item: S3Repository.S3Object) {
+    fun getViewerType(item: S3Repository.S3Object): String {
         val extension = item.displayName.substringAfterLast(".", "").lowercase()
         val textExtensions = setOf(
-            "txt", "md", "markdown", "json", "csv", 
+            "txt", "md", "markdown", "json", "csv",
             "py", "c", "cpp", "h", "java", "kt", "js", "ts", "html", "css", "xml", "yaml", "yml", "sh"
         )
         val mediaExtensions = setOf(
@@ -124,77 +95,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             "mp3", "wav", "ogg", "m4a", "aac", "flac", "amr", "mid", "midi",
             "mp4", "mkv", "webm", "avi", "mov", "3gp", "ts"
         )
-        
-        if (textExtensions.contains(extension)) {
-            // 先切换页面，再加载
-            _fileContent.value = "" // Clear previous content
-            _isPreviewMode.value = extension != "txt"
-            _editingFile.value = item
-            
-            viewModelScope.launch {
-                _isLoading.value = true
-                _error.value = null
-                try {
-                    val content = S3Repository.getObjectContent(currentBucketName, item.key)
-                    _fileContent.value = content
-                } catch (e: Exception) {
-                    _error.value = getErrorMessage(e)
-                } finally {
-                    _isLoading.value = false
-                }
-            }
-        } else if (mediaExtensions.contains(extension)) {
-            // 先切换页面，再加载
-            _viewingMediaFile.value = item to null
-            
-            viewModelScope.launch {
-                _isLoading.value = true
-                _error.value = null
-                try {
-                    val file = File(getApplication<Application>().cacheDir, item.displayName)
-                    S3Repository.downloadFile(currentBucketName, item.key, file)
-                    // Update with downloaded file
-                    _viewingMediaFile.value = item to file
-                } catch (e: Exception) {
-                    _error.value = getErrorMessage(e)
-                    // Close viewer on error
-                    _viewingMediaFile.value = null
-                } finally {
-                    _isLoading.value = false
-                }
-            }
-        } else {
-            // 非支持文件，进入不支持页面
-            _viewingUnsupportedFile.value = item
+
+        return when {
+            textExtensions.contains(extension) -> "text"
+            mediaExtensions.contains(extension) -> "media"
+            else -> "unsupported"
         }
     }
 
     fun togglePreviewMode() {
-        _isPreviewMode.value = !_isPreviewMode.value
+        // This is now handled in ViewerViewModel
     }
 
     fun saveFileContent(content: String) {
-        val file = _editingFile.value ?: return
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-            try {
-                S3Repository.putObjectContent(currentBucketName, file.key, content)
-                _fileContent.value = content
-                // 保存后不再自动退出编辑，符合用户新需求
-                loadFiles(currentBucketName, _currentPrefix.value)
-            } catch (e: Exception) {
-                _error.value = getErrorMessage(e)
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun closeFile() {
-        _editingFile.value = null
-        _viewingUnsupportedFile.value = null
-        _fileContent.value = ""
+        // This is now handled in ViewerViewModel
     }
 
     fun deleteItem(item: S3Repository.S3Object) {
@@ -331,9 +245,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _successMessage.value = null
     }
 
-    fun closeMediaFile() {
-        _viewingMediaFile.value = null
-    }
+
 
     fun openExternal(item: S3Repository.S3Object) {
         viewModelScope.launch {

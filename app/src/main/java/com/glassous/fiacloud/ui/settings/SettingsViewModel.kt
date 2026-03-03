@@ -20,9 +20,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val activeS3Config: StateFlow<S3Config?> = settingsRepo.activeS3Config
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val themeMode: StateFlow<String> = settingsRepo.themeMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SYSTEM")
+
     init {
         viewModelScope.launch {
             settingsRepo.migrateIfNecessary()
+        }
+    }
+
+    fun setThemeMode(mode: String) {
+        viewModelScope.launch {
+            settingsRepo.setThemeMode(mode)
         }
     }
 

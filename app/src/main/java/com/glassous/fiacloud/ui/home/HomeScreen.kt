@@ -1,5 +1,6 @@
 package com.glassous.fiacloud.ui.home
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,11 +27,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.glassous.fiacloud.ViewerActivity
 import com.glassous.fiacloud.data.S3Repository
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,11 +47,8 @@ fun HomeScreen(
     val error by viewModel.error.collectAsState()
     val successMessage by viewModel.successMessage.collectAsState()
     val currentPrefix by viewModel.currentPrefix.collectAsState()
-    val editingFile by viewModel.editingFile.collectAsState()
-    val viewingUnsupportedFile by viewModel.viewingUnsupportedFile.collectAsState()
-    val viewingMediaFile by viewModel.viewingMediaFile.collectAsState()
-    val fileContent by viewModel.fileContent.collectAsState()
-    val isPreviewMode by viewModel.isPreviewMode.collectAsState()
+    
+    val context = LocalContext.current
 
     val uploadLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -83,107 +83,91 @@ fun HomeScreen(
         )
     }
 
-    BackHandler(enabled = currentPrefix.isNotEmpty() || editingFile != null || viewingUnsupportedFile != null || viewingMediaFile != null) {
+    BackHandler(enabled = currentPrefix.isNotEmpty()) {
         viewModel.navigateBack()
     }
 
-    if (editingFile != null) {
-        TextEditorScreen(
-            file = editingFile!!,
-            initialContent = fileContent,
-            isPreviewMode = isPreviewMode,
-            onBack = { viewModel.closeFile() },
-            onSave = { viewModel.saveFileContent(it) },
-            onTogglePreview = { viewModel.togglePreviewMode() }
-        )
-    } else if (viewingUnsupportedFile != null) {
-        UnsupportedFileScreen(
-            file = viewingUnsupportedFile!!,
-            onBack = { viewModel.closeFile() },
-            onOpenExternal = { viewModel.openExternal(viewingUnsupportedFile!!) }
-        )
-    } else if (viewingMediaFile != null) {
-        val (item, file) = viewingMediaFile!!
-        MediaViewerScreen(
-            file = file,
-            item = item,
-            onBack = { viewModel.closeMediaFile() }
-        )
-    } else {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { 
-                        Column {
-                            Text("FiaCloud")
-                            if (currentPrefix.isNotEmpty()) {
-                                Text(
-                                    text = currentPrefix,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text("FiaCloud")
                         if (currentPrefix.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.navigateBack() }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                            }
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { showCreateFileDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "新建文件")
-                        }
-                        IconButton(onClick = { uploadLauncher.launch(arrayOf("*/*")) }) {
-                            Icon(Icons.Default.FileUpload, contentDescription = "上传文件")
-                        }
-                        IconButton(onClick = { viewModel.refresh() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                        }
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "设置")
-                        }
-                    },
-                    windowInsets = WindowInsets.statusBars
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
-        ) { padding ->
-            Box(modifier = Modifier
-                .padding(top = padding.calculateTopPadding())
-                .fillMaxSize()) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else if (error != null) {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = error!!, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = onNavigateToSettings) {
-                            Text("去设置")
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(
-                            bottom = padding.calculateBottomPadding()
-                        )
-                    ) {
-                        items(files) { item ->
-                            S3ItemRow(
-                                item = item,
-                                onFolderClick = { viewModel.navigateInto(item.key) },
-                                onFileClick = { viewModel.openFile(item) },
-                                onDelete = { viewModel.deleteItem(item) },
-                                onRename = { newName -> viewModel.renameItem(item, newName) },
-                                onDownload = { viewModel.downloadItem(item) }
+                            Text(
+                                text = currentPrefix,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                },
+                navigationIcon = {
+                    if (currentPrefix.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.navigateBack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showCreateFileDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "新建文件")
+                    }
+                    IconButton(onClick = { uploadLauncher.launch(arrayOf("*/*")) }) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "上传文件")
+                    }
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "刷新")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                    }
+                },
+                windowInsets = WindowInsets.statusBars
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { padding ->
+        Box(modifier = Modifier
+            .padding(top = padding.calculateTopPadding())
+            .fillMaxSize()) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (error != null) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = error!!, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = onNavigateToSettings) {
+                        Text("去设置")
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        bottom = padding.calculateBottomPadding()
+                    )
+                ) {
+                    items(files) { item ->
+                        S3ItemRow(
+                            item = item,
+                            onFolderClick = { viewModel.navigateInto(item.key) },
+                            onFileClick = {
+                                val intent = Intent(context, ViewerActivity::class.java).apply {
+                                    putExtra("key", item.key)
+                                    putExtra("displayName", item.displayName)
+                                    putExtra("isFolder", item.isFolder)
+                                    putExtra("viewerType", viewModel.getViewerType(item))
+                                }
+                                context.startActivity(intent)
+                            },
+                            onDelete = { viewModel.deleteItem(item) },
+                            onRename = { newName -> viewModel.renameItem(item, newName) },
+                            onDownload = { viewModel.downloadItem(item) }
+                        )
                     }
                 }
             }

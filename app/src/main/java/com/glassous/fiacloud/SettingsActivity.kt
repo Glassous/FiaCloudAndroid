@@ -40,13 +40,15 @@ class SettingsActivity : ComponentActivity() {
             )
         )
         setContent {
-            FiaCloudTheme {
+            val viewModel: SettingsViewModel = viewModel()
+            val themeMode by viewModel.themeMode.collectAsState()
+
+            FiaCloudTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    val viewModel: SettingsViewModel = viewModel()
                     var showAddDialog by remember { mutableStateOf(false) }
                     var newConfigName by remember { mutableStateOf("") }
 
