@@ -29,11 +29,13 @@ fun UnsupportedFileScreen(
                 },
                 windowInsets = WindowInsets.statusBars
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Box(
             modifier = Modifier
-                .padding(padding)
+                .padding(top = padding.calculateTopPadding())
                 .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {

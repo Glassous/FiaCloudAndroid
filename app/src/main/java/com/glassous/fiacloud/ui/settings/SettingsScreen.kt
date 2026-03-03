@@ -51,7 +51,8 @@ fun SettingsScreen(
                 windowInsets = WindowInsets.statusBars
             )
         },
-        contentWindowInsets = WindowInsets.navigationBars
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
             modifier = Modifier
@@ -83,7 +84,9 @@ fun SettingsScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.height(padding.calculateBottomPadding() + 16.dp))
+            // 底部留白，确保不被导航栏完全挡住重要内容，但允许背景延伸
+            Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

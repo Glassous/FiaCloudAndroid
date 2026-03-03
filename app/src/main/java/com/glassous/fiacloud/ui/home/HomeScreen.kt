@@ -33,6 +33,7 @@ fun HomeScreen(
     val editingFile by viewModel.editingFile.collectAsState()
     val viewingUnsupportedFile by viewModel.viewingUnsupportedFile.collectAsState()
     val fileContent by viewModel.fileContent.collectAsState()
+    val isPreviewMode by viewModel.isPreviewMode.collectAsState()
 
     BackHandler(enabled = currentPrefix.isNotEmpty() || editingFile != null || viewingUnsupportedFile != null) {
         viewModel.navigateBack()
@@ -42,8 +43,10 @@ fun HomeScreen(
         TextEditorScreen(
             file = editingFile!!,
             initialContent = fileContent,
+            isPreviewMode = isPreviewMode,
             onBack = { viewModel.closeFile() },
-            onSave = { viewModel.saveFileContent(it) }
+            onSave = { viewModel.saveFileContent(it) },
+            onTogglePreview = { viewModel.togglePreviewMode() }
         )
     } else if (viewingUnsupportedFile != null) {
         UnsupportedFileScreen(
@@ -84,7 +87,8 @@ fun HomeScreen(
                     windowInsets = WindowInsets.statusBars
                 )
             },
-            contentWindowInsets = WindowInsets.navigationBars
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { padding ->
             Box(modifier = Modifier
                 .padding(top = padding.calculateTopPadding())

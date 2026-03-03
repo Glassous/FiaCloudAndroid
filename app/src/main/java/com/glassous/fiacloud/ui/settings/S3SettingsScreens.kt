@@ -56,18 +56,21 @@ fun S3ListScreen(
                     if (showHelpDialog) {
                         S3HelpDialog(onDismiss = { showHelpDialog = false })
                     }
-                }
+                },
+                windowInsets = WindowInsets.statusBars
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         if (configs.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.Center) {
                 Text("暂无配置，请点击右上角新增")
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
+                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(configs) { config ->
@@ -78,6 +81,9 @@ fun S3ListScreen(
                         onEdit = { onNavigateToDetail(config.id) },
                         onDelete = { showDeleteDialog = config.id }
                     )
+                }
+                item {
+                    Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 }
             }
         }
@@ -166,13 +172,17 @@ fun S3DetailScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
-                }
+                },
+                windowInsets = WindowInsets.statusBars
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             Surface(
                 tonalElevation = 3.dp,
-                shadowElevation = 8.dp
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Button(
                     onClick = {
@@ -200,7 +210,7 @@ fun S3DetailScreen(
     ) { padding ->
         Column(
             modifier = Modifier
-                .padding(padding)
+                .padding(top = padding.calculateTopPadding())
                 .padding(horizontal = 16.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),

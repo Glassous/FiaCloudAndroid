@@ -32,6 +32,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _fileContent = MutableStateFlow<String>("")
     val fileContent: StateFlow<String> = _fileContent.asStateFlow()
 
+    private val _isPreviewMode = MutableStateFlow(true)
+    val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
+
     private var currentBucketName: String = ""
 
     init {
@@ -96,13 +99,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openFile(item: S3Repository.S3Object) {
-        if (item.displayName.endsWith(".txt", ignoreCase = true)) {
+        val extension = item.displayName.substringAfterLast(".", "").lowercase()
+        val supportedExtensions = setOf(
+            "txt", "md", "markdown", "json", "csv", 
+            "py", "c", "cpp", "h", "java", "kt", "js", "ts", "html", "css", "xml", "yaml", "yml", "sh"
+        )
+        
+        if (supportedExtensions.contains(extension)) {
             viewModelScope.launch {
                 _isLoading.value = true
                 _error.value = null
                 try {
                     val content = S3Repository.getObjectContent(currentBucketName, item.key)
                     _fileContent.value = content
+                    _isPreviewMode.value = extension != "txt" // 默认开启预览模式，除了 txt
                     _editingFile.value = item
                 } catch (e: Exception) {
                     _error.value = getErrorMessage(e)
@@ -111,9 +121,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } else {
-            // 非 .txt 文件，进入不支持页面
+            // 非支持文件，进入不支持页面
             _viewingUnsupportedFile.value = item
         }
+    }
+
+    fun togglePreviewMode() {
+        _isPreviewMode.value = !_isPreviewMode.value
     }
 
     fun saveFileContent(content: String) {
