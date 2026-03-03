@@ -10,6 +10,9 @@ import kotlinx.coroutines.withContext
 import aws.smithy.kotlin.runtime.collections.Attributes
 import aws.smithy.kotlin.runtime.content.ByteStream
 import aws.smithy.kotlin.runtime.content.decodeToString
+import aws.smithy.kotlin.runtime.content.fromFile
+import aws.smithy.kotlin.runtime.content.writeToFile
+import java.io.File
 
 object S3Repository {
     private var s3Client: S3Client? = null
@@ -112,6 +115,37 @@ object S3Repository {
                 body = ByteStream.fromString(content)
             }
             client.putObject(request)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun uploadFile(bucketName: String, key: String, file: File) = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            val request = PutObjectRequest {
+                bucket = bucketName
+                this.key = key
+                body = ByteStream.fromFile(file)
+            }
+            client.putObject(request)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun downloadFile(bucketName: String, key: String, file: File) = withContext(Dispatchers.IO) {
+        val client = s3Client ?: throw IllegalStateException("S3 客户端未配置，请前往设置页面进行配置。")
+        try {
+            val request = GetObjectRequest {
+                bucket = bucketName
+                this.key = key
+            }
+            client.getObject(request) { response ->
+                response.body?.writeToFile(file)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             throw e

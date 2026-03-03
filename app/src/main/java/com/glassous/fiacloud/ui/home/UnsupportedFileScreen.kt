@@ -16,7 +16,8 @@ import com.glassous.fiacloud.data.S3Repository
 @Composable
 fun UnsupportedFileScreen(
     file: S3Repository.S3Object,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenExternal: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -58,11 +59,15 @@ fun UnsupportedFileScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "当前版本仅支持预览和编辑 .txt 文本文件。",
+                    text = "当前版本仅支持预览和编辑文本文件以及查看部分媒体文件。",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onOpenExternal) {
+                    Text("尝试用其他应用打开")
+                }
             }
         }
     }

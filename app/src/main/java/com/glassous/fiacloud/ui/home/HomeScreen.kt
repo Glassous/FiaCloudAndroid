@@ -1,6 +1,8 @@
 package com.glassous.fiacloud.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +10,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -29,13 +34,48 @@ fun HomeScreen(
     val files by viewModel.files.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val successMessage by viewModel.successMessage.collectAsState()
     val currentPrefix by viewModel.currentPrefix.collectAsState()
     val editingFile by viewModel.editingFile.collectAsState()
     val viewingUnsupportedFile by viewModel.viewingUnsupportedFile.collectAsState()
+    val viewingMediaFile by viewModel.viewingMediaFile.collectAsState()
     val fileContent by viewModel.fileContent.collectAsState()
     val isPreviewMode by viewModel.isPreviewMode.collectAsState()
 
-    BackHandler(enabled = currentPrefix.isNotEmpty() || editingFile != null || viewingUnsupportedFile != null) {
+    val uploadLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.uploadFile(uri)
+        }
+    }
+
+    var showCreateFileDialog by remember { mutableStateOf(false) }
+
+    if (successMessage != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearSuccessMessage() },
+            title = { Text("成功") },
+            text = { Text(successMessage!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearSuccessMessage() }) {
+                    Text("确定")
+                }
+            }
+        )
+    }
+
+    if (showCreateFileDialog) {
+        CreateFileDialog(
+            onDismiss = { showCreateFileDialog = false },
+            onConfirm = { name ->
+                viewModel.createFile(name)
+                showCreateFileDialog = false
+            }
+        )
+    }
+
+    BackHandler(enabled = currentPrefix.isNotEmpty() || editingFile != null || viewingUnsupportedFile != null || viewingMediaFile != null) {
         viewModel.navigateBack()
     }
 
@@ -51,7 +91,15 @@ fun HomeScreen(
     } else if (viewingUnsupportedFile != null) {
         UnsupportedFileScreen(
             file = viewingUnsupportedFile!!,
-            onBack = { viewModel.closeFile() }
+            onBack = { viewModel.closeFile() },
+            onOpenExternal = { viewModel.openExternal(viewingUnsupportedFile!!) }
+        )
+    } else if (viewingMediaFile != null) {
+        val (item, file) = viewingMediaFile!!
+        MediaViewerScreen(
+            file = file,
+            item = item,
+            onBack = { viewModel.closeMediaFile() }
         )
     } else {
         Scaffold(
@@ -77,6 +125,12 @@ fun HomeScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { showCreateFileDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "新建文件")
+                        }
+                        IconButton(onClick = { uploadLauncher.launch(arrayOf("*/*")) }) {
+                            Icon(Icons.Default.FileUpload, contentDescription = "上传文件")
+                        }
                         IconButton(onClick = { viewModel.refresh() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "刷新")
                         }
@@ -118,7 +172,8 @@ fun HomeScreen(
                                 onFolderClick = { viewModel.navigateInto(item.key) },
                                 onFileClick = { viewModel.openFile(item) },
                                 onDelete = { viewModel.deleteItem(item) },
-                                onRename = { newName -> viewModel.renameItem(item, newName) }
+                                onRename = { newName -> viewModel.renameItem(item, newName) },
+                                onDownload = { viewModel.downloadItem(item) }
                             )
                         }
                     }
@@ -134,7 +189,8 @@ fun S3ItemRow(
     onFolderClick: () -> Unit,
     onFileClick: () -> Unit,
     onDelete: () -> Unit,
-    onRename: (String) -> Unit
+    onRename: (String) -> Unit,
+    onDownload: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -182,6 +238,14 @@ fun S3ItemRow(
                     onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
+                        text = { Text("下载") },
+                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                        onClick = {
+                            showMenu = false
+                            onDownload()
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("重命名") },
                         onClick = {
                             showMenu = false
@@ -203,6 +267,44 @@ fun S3ItemRow(
                 onFolderClick()
             } else {
                 onFileClick()
+            }
+        }
+    )
+}
+
+@Composable
+fun CreateFileDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("新建文件") },
+        text = {
+            Column {
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    placeholder = { Text("example") },
+                    suffix = { Text(".txt") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(text) },
+                enabled = text.isNotBlank()
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
             }
         }
     )
