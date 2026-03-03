@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Preview
 import androidx.compose.material.icons.filled.Save
@@ -67,7 +68,7 @@ fun TextEditorScreen(
                     if (showPreviewToggle && !isEditing) {
                         IconButton(onClick = onTogglePreview) {
                             Icon(
-                                imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.Preview,
+                                imageVector = if (isPreviewMode) Icons.Default.Code else Icons.Default.Preview,
                                 contentDescription = if (isPreviewMode) "源码模式" else "预览模式"
                             )
                         }

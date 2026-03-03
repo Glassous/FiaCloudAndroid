@@ -3,7 +3,9 @@ package com.glassous.fiacloud.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,7 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
@@ -21,7 +25,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.glassous.fiacloud.data.S3Repository
 
@@ -183,6 +191,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun S3ItemRow(
     item: S3Repository.S3Object,
@@ -192,9 +201,28 @@ fun S3ItemRow(
     onRename: (String) -> Unit,
     onDownload: () -> Unit
 ) {
-    var showMenu by remember { mutableStateOf(false) }
+    var showOptionsDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showOptionsDialog) {
+        FileOptionsDialog(
+            item = item,
+            onDismiss = { showOptionsDialog = false },
+            onDownload = {
+                showOptionsDialog = false
+                onDownload()
+            },
+            onRename = {
+                showOptionsDialog = false
+                showRenameDialog = true
+            },
+            onDelete = {
+                showOptionsDialog = false
+                showDeleteConfirmDialog = true
+            }
+        )
+    }
 
     if (showRenameDialog) {
         RenameDialog(
@@ -228,48 +256,143 @@ fun S3ItemRow(
                 tint = if (item.isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
             )
         },
-        trailingContent = {
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多选项")
+        modifier = Modifier
+            .combinedClickable(
+                onClick = {
+                    if (item.isFolder) {
+                        onFolderClick()
+                    } else {
+                        onFileClick()
+                    }
+                },
+                onLongClick = {
+                    showOptionsDialog = true
                 }
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
+            )
+    )
+}
+
+@Composable
+fun FileOptionsDialog(
+    item: S3Repository.S3Object,
+    onDismiss: () -> Unit,
+    onDownload: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = if (item.isFolder) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = if (item.isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = item.displayName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = if (item.isFolder) "文件夹选项" else "文件选项",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("下载") },
-                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onDownload()
-                        }
+                    OptionButton(
+                        icon = Icons.Default.Download,
+                        label = "下载",
+                        onClick = onDownload,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                    DropdownMenuItem(
-                        text = { Text("重命名") },
-                        onClick = {
-                            showMenu = false
-                            showRenameDialog = true
-                        }
+                    
+                    OptionButton(
+                        icon = Icons.Default.DriveFileRenameOutline,
+                        label = "重命名",
+                        onClick = onRename,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-                    DropdownMenuItem(
-                        text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            showMenu = false
-                            showDeleteConfirmDialog = true
-                        }
+                    
+                    OptionButton(
+                        icon = Icons.Default.Delete,
+                        label = "删除",
+                        onClick = onDelete,
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
-            }
-        },
-        modifier = Modifier.clickable {
-            if (item.isFolder) {
-                onFolderClick()
-            } else {
-                onFileClick()
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("取消")
+                }
             }
         }
-    )
+    }
+}
+
+@Composable
+fun OptionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    containerColor: androidx.compose.ui.graphics.Color,
+    contentColor: androidx.compose.ui.graphics.Color
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
 @Composable
