@@ -1,5 +1,6 @@
 package com.glassous.fiacloud.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -50,6 +51,16 @@ fun TextEditorScreen(
     val isImeVisible = WindowInsets.isImeVisible
     val density = LocalDensity.current
     val extension = file.displayName.substringAfterLast(".", "").lowercase()
+
+    BackHandler {
+        if (isEditing) {
+            isEditing = false
+            content = lastSavedContent
+            textFieldValue = TextFieldValue(lastSavedContent)
+        } else {
+            onBack()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),

@@ -1,5 +1,6 @@
 package com.glassous.fiacloud.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +37,8 @@ fun SettingsScreen(
 ) {
     val activeS3Config by viewModel.activeS3Config.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+
+    BackHandler(onBack = onNavigateBack)
 
     Scaffold(
         topBar = {

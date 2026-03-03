@@ -1,5 +1,6 @@
 package com.glassous.fiacloud.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,8 @@ fun S3ListScreen(
     val configs by viewModel.s3Configs.collectAsState()
     val activeId by viewModel.activeS3ConfigId.collectAsState()
     var showDeleteDialog by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(onBack = onNavigateBack)
 
     Scaffold(
         topBar = {
@@ -154,6 +157,8 @@ fun S3DetailScreen(
 ) {
     val configs by viewModel.s3Configs.collectAsState()
     val config = configs.find { it.id == configId } ?: return
+
+    BackHandler(onBack = onNavigateBack)
 
     var name by remember(config) { mutableStateOf(config.name) }
     var endpoint by remember(config) { mutableStateOf(config.endpoint) }
