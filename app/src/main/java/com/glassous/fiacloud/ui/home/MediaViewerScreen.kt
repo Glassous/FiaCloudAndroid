@@ -284,7 +284,12 @@ fun AudioPlayer(file: File) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Icon removed
+        Icon(
+            imageVector = FileIconUtils.getFileIcon(file.name, false),
+            contentDescription = null,
+            modifier = Modifier.size(128.dp),
+            tint = FileIconUtils.getFileIconColor(file.name, false)
+        )
         
         Spacer(modifier = Modifier.height(32.dp))
         

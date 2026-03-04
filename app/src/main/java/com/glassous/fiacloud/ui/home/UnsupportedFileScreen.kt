@@ -46,10 +46,10 @@ fun UnsupportedFileScreen(
                 modifier = Modifier.padding(24.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Info,
+                    imageVector = FileIconUtils.getFileIcon(file.displayName, file.isFolder),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.secondary
+                    tint = FileIconUtils.getFileIconColor(file.displayName, file.isFolder)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(

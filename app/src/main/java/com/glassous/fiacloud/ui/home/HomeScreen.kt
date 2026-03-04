@@ -235,9 +235,9 @@ fun S3ItemRow(
         headlineContent = { Text(item.displayName) },
         leadingContent = {
             Icon(
-                imageVector = if (item.isFolder) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
+                imageVector = FileIconUtils.getFileIcon(item.displayName, item.isFolder),
                 contentDescription = null,
-                tint = if (item.isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                tint = FileIconUtils.getFileIconColor(item.displayName, item.isFolder)
             )
         },
         modifier = Modifier
@@ -280,10 +280,10 @@ fun FileOptionsDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    imageVector = if (item.isFolder) Icons.Default.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
+                    imageVector = FileIconUtils.getFileIcon(item.displayName, item.isFolder),
                     contentDescription = null,
                     modifier = Modifier.size(48.dp),
-                    tint = if (item.isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    tint = FileIconUtils.getFileIconColor(item.displayName, item.isFolder)
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
