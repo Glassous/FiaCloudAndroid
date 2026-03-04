@@ -19,11 +19,18 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 仅保留需要的语言资源，减小体积
+        resourceConfigurations += listOf("en", "zh")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 启用代码压缩、混淆和优化
+            isMinifyEnabled = true
+            // 启用资源压缩，需配合 isMinifyEnabled = true 使用
+            isShrinkResources = true
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
