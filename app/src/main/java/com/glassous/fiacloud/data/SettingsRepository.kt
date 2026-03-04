@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -28,15 +29,26 @@ class SettingsRepository(private val context: Context) {
         val S3_CONFIGS = stringPreferencesKey("s3_configs")
         val ACTIVE_S3_CONFIG_ID = stringPreferencesKey("active_s3_config_id")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val AUTO_UPDATE_CHECK = booleanPreferencesKey("auto_update_check")
     }
 
     val themeMode: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_MODE] ?: "SYSTEM"
     }
 
+    val autoUpdateCheck: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_UPDATE_CHECK] ?: true
+    }
+
     suspend fun setThemeMode(mode: String) {
         context.dataStore.edit { preferences ->
             preferences[THEME_MODE] = mode
+        }
+    }
+
+    suspend fun setAutoUpdateCheck(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_UPDATE_CHECK] = enabled
         }
     }
 

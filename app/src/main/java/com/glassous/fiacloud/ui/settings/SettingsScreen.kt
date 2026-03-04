@@ -21,6 +21,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import android.content.pm.PackageManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -37,8 +39,58 @@ fun SettingsScreen(
 ) {
     val activeS3Config by viewModel.activeS3Config.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val autoUpdateCheck by viewModel.autoUpdateCheck.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
+    val context = LocalContext.current
+    val currentVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "1.0.0"
+        }
+    }
 
     BackHandler(onBack = onNavigateBack)
+
+    if (updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearUpdateInfo() },
+            title = { Text(if (updateInfo!!.hasUpdate) "发现新版本" else "当前已是最新版本") },
+            text = {
+                if (updateInfo!!.hasUpdate) {
+                    Column {
+                        Text("版本: ${updateInfo!!.latestVersion}")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(updateInfo!!.releaseNotes)
+                    }
+                } else {
+                    Text("当前版本已经是最新版本。")
+                }
+            },
+            confirmButton = {
+                if (updateInfo!!.hasUpdate && updateInfo!!.downloadUrl != null) {
+                    Button(onClick = {
+                        viewModel.openDownloadUrl(updateInfo!!.downloadUrl!!)
+                        viewModel.clearUpdateInfo()
+                    }) {
+                        Text("前往下载")
+                    }
+                } else {
+                    TextButton(onClick = { viewModel.clearUpdateInfo() }) {
+                        Text("确定")
+                    }
+                }
+            },
+            dismissButton = {
+                if (updateInfo!!.hasUpdate) {
+                    TextButton(onClick = { viewModel.clearUpdateInfo() }) {
+                        Text("以后再说")
+                    }
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -116,6 +168,68 @@ fun SettingsScreen(
                         )
                     }
                     Icon(Icons.Default.ChevronRight, "详情")
+                }
+            }
+
+            // 版本与更新
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "版本与更新",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("自动检测更新", style = MaterialTheme.typography.bodyLarge)
+                        Switch(
+                            checked = autoUpdateCheck,
+                            onCheckedChange = { viewModel.setAutoUpdateCheck(it) }
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("当前版本", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                currentVersion,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        Button(
+                            onClick = { viewModel.checkForUpdate() },
+                            enabled = !isCheckingUpdate
+                        ) {
+                            if (isCheckingUpdate) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("正在检查...")
+                            } else {
+                                Text("检查更新")
+                            }
+                        }
+                    }
                 }
             }
             

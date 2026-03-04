@@ -7,6 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.glassous.fiacloud.data.S3Repository
 import com.glassous.fiacloud.data.SettingsRepository
+import com.glassous.fiacloud.data.UpdateInfo
+import com.glassous.fiacloud.data.UpdateManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -14,6 +16,7 @@ import java.io.FileOutputStream
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepo = SettingsRepository(application)
+    private val updateManager = UpdateManager(application)
     
     private val _files = MutableStateFlow<List<S3Repository.S3Object>>(emptyList())
     val files: StateFlow<List<S3Repository.S3Object>> = _files.asStateFlow()
@@ -33,9 +36,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val themeMode: StateFlow<String> = settingsRepo.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "SYSTEM")
 
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
     private var currentBucketName: String = ""
 
     init {
+        viewModelScope.launch {
+            settingsRepo.autoUpdateCheck.first().let { enabled ->
+                if (enabled) {
+                    checkForUpdate()
+                }
+            }
+        }
         viewModelScope.launch {
             settingsRepo.activeS3Config.collectLatest { config ->
                 if (config != null) {
@@ -82,6 +95,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             loadFiles(currentBucketName, parent)
         }
         return true
+    }
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            val info = updateManager.checkForUpdate()
+            if (info.hasUpdate) {
+                _updateInfo.value = info
+            }
+        }
+    }
+
+    fun clearUpdateInfo() {
+        _updateInfo.value = null
+    }
+
+    fun openDownloadUrl(url: String) {
+        updateManager.openDownloadUrl(url)
     }
 
     fun getViewerType(item: S3Repository.S3Object): String {
