@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -70,6 +71,8 @@ fun ViewerContent(
     val isPreviewMode by viewModel.isPreviewMode.collectAsState()
     val mediaFile by viewModel.mediaFile.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isDownloading by viewModel.isDownloading.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
     val error by viewModel.error.collectAsState()
 
     // 初始化加载数据
@@ -77,39 +80,64 @@ fun ViewerContent(
         viewModel.loadFile(s3Object, viewerType)
     }
 
-    if (isLoading) {
-        LoadingBox()
-    } else if (error != null) {
-        ErrorBox(error!!, onBack)
-    } else {
-        when (viewerType) {
-            "text" -> {
-                TextEditorScreen(
-                    file = s3Object,
-                    initialContent = fileContent,
-                    isPreviewMode = isPreviewMode,
-                    onBack = onBack,
-                    onSave = { viewModel.saveFileContent(s3Object, it) },
-                    onTogglePreview = { viewModel.togglePreviewMode() }
-                )
-            }
-            "media" -> {
-                if (mediaFile != null) {
-                    MediaViewerScreen(
-                        file = mediaFile,
-                        item = s3Object,
-                        onBack = onBack
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isLoading) {
+            LoadingBox()
+        } else if (error != null) {
+            ErrorBox(error!!, onBack)
+        } else {
+            when (viewerType) {
+                "text" -> {
+                    TextEditorScreen(
+                        file = s3Object,
+                        initialContent = fileContent,
+                        isPreviewMode = isPreviewMode,
+                        onBack = onBack,
+                        onSave = { viewModel.saveFileContent(s3Object, it) },
+                        onTogglePreview = { viewModel.togglePreviewMode() }
                     )
-                } else {
-                    LoadingBox()
+                }
+                "media" -> {
+                    if (mediaFile != null) {
+                        MediaViewerScreen(
+                            file = mediaFile,
+                            item = s3Object,
+                            onBack = onBack
+                        )
+                    } else {
+                        LoadingBox()
+                    }
+                }
+                "unsupported" -> {
+                    UnsupportedFileScreen(
+                        file = s3Object,
+                        onBack = onBack,
+                        onOpenExternal = { viewModel.openExternal(s3Object) }
+                    )
                 }
             }
-            "unsupported" -> {
-                UnsupportedFileScreen(
-                    file = s3Object,
-                    onBack = onBack,
-                    onOpenExternal = { viewModel.openExternal(s3Object) }
-                )
+        }
+
+        if (isDownloading) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    if (downloadProgress != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = downloadProgress!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             }
         }
     }

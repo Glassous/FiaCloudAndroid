@@ -1,6 +1,10 @@
 package com.glassous.fiacloud.ui.viewer
 
 import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.glassous.fiacloud.data.S3Repository
@@ -14,6 +18,12 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _isDownloading = MutableStateFlow(false)
+    val isDownloading: StateFlow<Boolean> = _isDownloading.asStateFlow()
+
+    private val _downloadProgress = MutableStateFlow<String?>(null)
+    val downloadProgress: StateFlow<String?> = _downloadProgress.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -102,8 +112,53 @@ class ViewerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
-    
+
     fun openExternal(item: S3Repository.S3Object) {
-        // 实现外部打开逻辑，这里可以调用 S3Repository 或 Activity 逻辑
+        viewModelScope.launch {
+            if (currentBucketName.isEmpty()) {
+                _error.value = "未配置存储桶"
+                return@launch
+            }
+
+            _isDownloading.value = true
+            _error.value = null
+            _downloadProgress.value = "正在下载文件以供外部查看..."
+
+            try {
+                val context = getApplication<Application>()
+                val extension = item.displayName.substringAfterLast(".", "").lowercase()
+                val tempFile = File(context.cacheDir, "temp_view_${item.displayName}")
+                
+                // 下载文件
+                S3Repository.downloadFile(currentBucketName, item.key, tempFile)
+
+                // 获取 MIME 类型
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
+
+                // 使用 FileProvider 获取 Content URI
+                val contentUri: Uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.provider",
+                    tempFile
+                )
+
+                // 创建并启动 Intent
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, mimeType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                context.startActivity(Intent.createChooser(intent, "选择应用打开").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+
+            } catch (e: Exception) {
+                _error.value = "下载失败: ${e.message}"
+            } finally {
+                _isDownloading.value = false
+                _downloadProgress.value = null
+            }
+        }
     }
 }
