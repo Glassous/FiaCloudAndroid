@@ -23,6 +23,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.glassous.fiacloud.data.S3Repository
 
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TextEditorScreen(
@@ -37,6 +41,9 @@ fun TextEditorScreen(
     var textFieldValue by remember { mutableStateOf(TextFieldValue(initialContent)) }
     var isEditing by remember { mutableStateOf(false) }
     var lastSavedContent by remember { mutableStateOf(initialContent) }
+    var selectedCsvCellContent by remember { mutableStateOf<String?>(null) }
+    
+    val clipboardManager = LocalClipboardManager.current
 
     // 当云端内容更新时同步本地显示
     LaunchedEffect(initialContent) {
@@ -76,6 +83,15 @@ fun TextEditorScreen(
                 },
                 actions = {
                     val showPreviewToggle = setOf("md", "markdown", "json", "csv").contains(extension)
+                    
+                    if (isPreviewMode && extension == "csv" && selectedCsvCellContent != null) {
+                        IconButton(onClick = {
+                            clipboardManager.setText(AnnotatedString(selectedCsvCellContent!!))
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "复制单元格内容")
+                        }
+                    }
+
                     if (showPreviewToggle && !isEditing) {
                         IconButton(onClick = onTogglePreview) {
                             Icon(
@@ -113,7 +129,9 @@ fun TextEditorScreen(
                     when (extension) {
                         "md", "markdown" -> MarkdownPreview(content)
                         "json" -> JsonPreview(content)
-                        "csv" -> CsvPreview(content)
+                        "csv" -> CsvPreview(content) { cellContent ->
+                            selectedCsvCellContent = cellContent
+                        }
                         else -> {
                             SourceEditor(
                                 textFieldValue = textFieldValue,
